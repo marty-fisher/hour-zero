@@ -96,11 +96,14 @@ def export_active_reel(output_path):
             # Segment-based Momentum Ratio
             if v_past > 0:
                 momentum = v_recent / v_past
+                # If velocity is decelerating, penalize the ratio quadratically to crash "Flash in the Pan" spikes
+                if momentum < 1.0:
+                    momentum = momentum ** 2
             else:
                 momentum = 1.0 # If no previous segment vs current, base model applies
                 
-            # Clamp momentum to prevent wild exponential blowouts or flatlines
-            momentum = max(0.3, min(momentum, 2.0))
+            # Clamp momentum to handle extreme drops, lowering bottom limit to 0.05 (~30m half-life)
+            momentum = max(0.05, min(momentum, 3.0))
             
             # Establish decay rate based on previous cumulative segment acceleration
             half_life_minutes = baseline_half_life * momentum

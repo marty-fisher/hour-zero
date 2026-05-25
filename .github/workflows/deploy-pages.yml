@@ -131,13 +131,15 @@ jobs:
                       # Segment-based Momentum Ratio
                       if v_past > 0:
                           momentum = v_recent / v_past
+                          # Penalize the ratio quadratically to crash "Flash in the Pan" spikes quickly
+                          if momentum < 1.0:
+                              momentum = momentum ** 2
                       else:
-                          momentum = 1.0 # If no previous segment vs current, base model applies
+                          momentum = 1.0 
                           
-                      # Clamp momentum to prevent wild exponential blowouts or flatlines
-                      momentum = max(0.3, min(momentum, 2.0))
+                      # Clamp momentum: lower bottom limit to 0.05 (~30m half-life limit)
+                      momentum = max(0.05, min(momentum, 3.0))
                       
-                      # Establish decay rate based on previous cumulative segment acceleration
                       half_life_minutes = baseline_half_life * momentum
                       
                       return math.log(2) / half_life_minutes
