@@ -137,8 +137,8 @@ jobs:
                       else:
                           momentum = 1.0 
                           
-                      # Clamp momentum: lower bottom limit to 0.05 (~30m half-life limit)
-                      momentum = max(0.05, min(momentum, 3.0))
+                      # Clamp momentum: lower bottom limit to 0.05 (~30m half-life limit), upper to 1.5
+                      momentum = max(0.05, min(momentum, 1.5))
                       
                       half_life_minutes = baseline_half_life * momentum
                       
