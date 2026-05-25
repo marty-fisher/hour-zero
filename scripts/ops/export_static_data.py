@@ -32,16 +32,19 @@ def export_active_reel(output_path):
 
     # 2. Extract series of binned velocities
     query = """
-        SELECT age_minutes, velocity, relative_velocity
-        FROM public.poll_metrics
-        WHERE reel_id = %s
-        ORDER BY polled_at ASC;
+        SELECT
+            EXTRACT(EPOCH FROM (p.polled_at - r.posted_at))::INT / 60 AS age_minutes,
+            p.velocity
+        FROM public.poll_metrics p
+        JOIN public.reels r ON p.reel_id = r.id
+        WHERE p.reel_id = %s
+        ORDER BY p.polled_at ASC;
     """
     cur.execute(query, (active_id,))
     rows = cur.fetchall()
     
     # Build payload with mock/DTW projections
-    points = [{"age_minutes": r[0], "velocity": r[1], "relative_velocity": r[2]} for r in rows]
+    points = [{"age_minutes": r[0], "velocity": r[1]} for r in rows]
     
     # Simple projection (Archetype Shape matching placeholder)
     projected_final_views = points[-1]["velocity"] * 1440 if points and points[-1]["velocity"] else 0 # 24hr rough projection
