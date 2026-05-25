@@ -32,30 +32,9 @@
                 </div>
             </div>
 
-            <div>
-                <span class="block text-sm text-gray-400 mb-2">24h Projection History</span>
-                <div class="grid grid-cols-4 gap-2 text-center border-b border-gray-700 pb-3 mb-3">
-                    <div class="bg-gray-700/50 rounded p-2">
-                        <span class="block text-xs text-gray-400">@ 15m</span>
-                        <span id="pred15m" class="text-lg font-bold text-blue-300">--</span>
-                    </div>
-                    <div class="bg-gray-700/50 rounded p-2">
-                        <span class="block text-xs text-gray-400">@ 30m</span>
-                        <span id="pred30m" class="text-lg font-bold text-blue-300">--</span>
-                    </div>
-                    <div class="bg-gray-700/50 rounded p-2">
-                        <span class="block text-xs text-gray-400">@ 45m</span>
-                        <span id="pred45m" class="text-lg font-bold text-blue-300">--</span>
-                    </div>
-                    <div class="bg-gray-700/50 rounded p-2">
-                        <span class="block text-xs text-gray-400">@ 60m</span>
-                        <span id="pred60m" class="text-lg font-bold text-blue-300">--</span>
-                    </div>
-                </div>
-                <div class="text-center bg-gray-800/80 rounded p-3 border border-gray-600 shadow-inner">
-                    <span class="block text-sm text-gray-400 mb-1">Current 24h Prediction</span>
-                    <span id="projectedViews" class="text-3xl font-bold text-green-400">--</span>
-                </div>
+            <div class="bg-gray-800 border border-gray-700 rounded-lg p-6 flex flex-col items-center justify-center">
+                <span class="text-sm font-medium text-gray-400 mb-2 uppercase tracking-wide">Current 24h Prediction</span>
+                <span id="projectedViews" class="text-3xl font-bold text-green-400">--</span>
             </div>
         </div>
 
@@ -257,59 +236,7 @@
                     });
                 };
 
-                // Get starting point views for each prediction
-                const valAt15 = getTrueData(15);
-                if (valAt15 && predictions["15m"]) {
-                    datasets.push({
-                        label: 'Proj @ 15m',
-                        data: createProjectionLine(valAt15, predictions["15m"], 15),
-                        borderColor: 'rgba(96, 165, 250, 0.4)', // blue-400 faded
-                        borderWidth: 1,
-                        borderDash: [5, 5],
-                        pointRadius: 0,
-                        fill: false
-                    });
-                }
-                
-                const valAt30 = getTrueData(30);
-                if (valAt30 && predictions["30m"]) {
-                    datasets.push({
-                        label: 'Proj @ 30m',
-                        data: createProjectionLine(valAt30, predictions["30m"], 30),
-                        borderColor: 'rgba(167, 139, 250, 0.4)', // purple-400 faded
-                        borderWidth: 1,
-                        borderDash: [5, 5],
-                        pointRadius: 0,
-                        fill: false
-                    });
-                }
-
-                const valAt45 = getTrueData(45);
-                if (valAt45 && predictions["45m"]) {
-                    datasets.push({
-                        label: 'Proj @ 45m',
-                        data: createProjectionLine(valAt45, predictions["45m"], 45),
-                        borderColor: 'rgba(244, 114, 182, 0.4)', // pink-400 faded
-                        borderWidth: 1,
-                        borderDash: [5, 5],
-                        pointRadius: 0,
-                        fill: false
-                    });
-                }
-
-                const valAt60 = getTrueData(60);
-                if (valAt60 && predictions["60m"]) {
-                    datasets.push({
-                        label: 'Proj @ 60m',
-                        data: createProjectionLine(valAt60, predictions["60m"], 60),
-                        borderColor: 'rgba(251, 146, 60, 0.4)', // orange-400 faded
-                        borderWidth: 1,
-                        borderDash: [5, 5],
-                        pointRadius: 0,
-                        fill: false
-                    });
-                }
-                
+                // Add the current projection heavily stylized
                 if (points.length > 0 && predictions["current"]) {
                     const latest = points[points.length - 1];
                     // Find nearest 15m interval for the "current" projection line start
@@ -318,7 +245,7 @@
                         label: 'Current Proj',
                         data: createProjectionLine(latest.views, predictions["current"], currentMins),
                         borderColor: 'rgba(250, 204, 21, 0.8)', // yellow-400
-                        borderWidth: 2,
+                        borderWidth: 3,
                         borderDash: [5, 5],
                         pointRadius: 0,
                         fill: false,
