@@ -43,6 +43,14 @@
                 Last Updated: --
             </div>
         </div>
+        
+        <!-- Cumulative Chart Container -->
+        <div class="bg-gray-800 rounded-xl p-4 mt-6 shadow-lg border border-gray-700">
+            <h2 class="text-sm text-gray-400 mb-4">Cumulative Views</h2>
+            <div class="relative h-64 w-full">
+                <canvas id="cumulativeChart"></canvas>
+            </div>
+        </div>
 
         <!-- No Data State (Hidden initially) -->
         <div id="noDataState" class="hidden mt-8 text-center text-gray-500">
@@ -79,7 +87,8 @@
 
         function updateUI(data) {
             // Update Card Info
-            document.getElementById('reelIdDisplay').innerText = data.reel_id.substring(0, 12) + "...";
+            const captionText = data.caption ? data.caption : data.reel_id.substring(0, 12) + "...";
+            document.getElementById('reelIdDisplay').innerText = captionText.length > 50 ? captionText.substring(0, 50) + "..." : captionText;
             
             const points = data.current_trajectory;
             if(points && points.length > 0) {
@@ -91,18 +100,20 @@
                 }
 
                 document.getElementById('lastUpdated').innerText = `Tracker Age: ${latest.age_minutes}m`;
-                
                 // Draw Chart
                 renderChart(points);
             }
         }
 
         let chartInstance = null;
+        let cumulativeChartInstance = null;
         function renderChart(points) {
+            const first90mPoints = points.filter(p => p.age_minutes <= 90);
+            
             const ctx = document.getElementById('velocityChart').getContext('2d');
             
-            const labels = points.map(p => `${p.age_minutes}m`);
-            const vpmData = points.map(p => p.velocity);
+            const labels = first90mPoints.map(p => `${p.age_minutes}m`);
+            const vpmData = first90mPoints.map(p => p.velocity);
 
             if (chartInstance) {
                 chartInstance.destroy();
@@ -133,6 +144,53 @@
                         x: {
                             grid: { color: 'rgba(255, 255, 255, 0.1)' },
                             ticks: { color: '#9ca3af', maxTicksLimit: 6 } // gray-400
+                        },
+                        y: {
+                            grid: { color: 'rgba(255, 255, 255, 0.1)' },
+                            ticks: { color: '#9ca3af' }
+                        }
+                    }
+                }
+            });
+
+            // Cumulative Chart
+            const cumulativeCtx = document.getElementById('cumulativeChart').getContext('2d');
+            const allLabels = points.map(p => `${p.age_minutes}m`);
+            let accum = 0;
+            const cumulativeData = points.map(p => {
+                accum += p.velocity;
+                return accum;
+            });
+
+            if (cumulativeChartInstance) {
+                cumulativeChartInstance.destroy();
+            }
+
+            cumulativeChartInstance = new Chart(cumulativeCtx, {
+                type: 'line',
+                data: {
+                    labels: allLabels,
+                    datasets: [{
+                        label: 'Cumulative Views',
+                        data: cumulativeData,
+                        borderColor: 'rgb(52, 211, 153)', // Tailwind emerald-400
+                        backgroundColor: 'rgba(52, 211, 153, 0.1)',
+                        borderWidth: 2,
+                        pointRadius: 1,
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        x: {
+                            grid: { color: 'rgba(255, 255, 255, 0.1)' },
+                            ticks: { color: '#9ca3af', maxTicksLimit: 6 }
                         },
                         y: {
                             grid: { color: 'rgba(255, 255, 255, 0.1)' },
