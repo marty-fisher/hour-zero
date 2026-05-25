@@ -44,8 +44,7 @@ Thumbs.db
 
 # Hidden source code
 backend/
-
-db/
-
+scripts/
+docs/
 deploy.sh
 requirements.txt
