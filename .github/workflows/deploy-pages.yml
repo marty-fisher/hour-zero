@@ -113,18 +113,23 @@ jobs:
                   current_age_minutes = smoothed_points[-1]["age_minutes"]
                   remaining_minutes = max(0, 1440 - current_age_minutes)
                   
-                  # Lookback window for velocity: instead of taking only the VERY LAST minute
-                  # (which might be 0 due to API chunking), average the last 15 minutes of velocity.
+                  # Lookback window for velocity: average the last 15 minutes of velocity.
                   recent_points = smoothed_points[-15:]
                   if recent_points:
                       current_velocity = sum(p["velocity"] for p in recent_points) / len(recent_points)
                   else:
                       current_velocity = 0
-
-                  # Use a much sharper decay model, as velocity usually drops fast after the main spike
-                  # Instead of V/2 across the whole period, assume V/5 to prevent blowing out early spikes
-                  avg_velocity_remaining = current_velocity / 5.0
-                  projected_final_views = current_views + (avg_velocity_remaining * remaining_minutes)
+                      
+                  import math
+                  half_life_minutes = 180.0
+                  decay_constant = math.log(2) / half_life_minutes
+                  
+                  if decay_constant > 0:
+                      accumlated_future_views = (current_velocity / decay_constant) * (1 - math.exp(-decay_constant * remaining_minutes))
+                  else:
+                      accumlated_future_views = current_velocity * remaining_minutes
+                      
+                  projected_final_views = current_views + accumlated_future_views
                   
                   # Generate historical predictions (15m, 30m, 45m)
                   def predict_at_minute(target_minute):
@@ -145,7 +150,12 @@ jobs:
                           
                       hist_remaining = max(0, 1440 - target_minute)
                       
-                      return hist_views + ((hist_velocity / 5.0) * hist_remaining)
+                      if decay_constant > 0:
+                          hist_future_views = (hist_velocity / decay_constant) * (1 - math.exp(-decay_constant * hist_remaining))
+                      else:
+                          hist_future_views = hist_velocity * hist_remaining
+                          
+                      return hist_views + hist_future_views
 
                   pred_15m = predict_at_minute(15)
                   pred_30m = predict_at_minute(30)
