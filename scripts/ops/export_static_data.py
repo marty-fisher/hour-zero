@@ -37,9 +37,7 @@ def export_active_reel(output_path):
             p.velocity,
             r.caption,
             r.posted_at,
-            p.views,
-            p.shares,
-            p.saved
+            p.views
         FROM public.poll_metrics p
         JOIN public.reels r ON p.reel_id = r.id
         WHERE p.reel_id = %s
@@ -57,12 +55,10 @@ def export_active_reel(output_path):
         age_m = r[0]
         vel = r[1]
         views = r[4]
-        shares = r[5] or 0
-        saved = r[6] or 0
         
         if vel == 0:
             zero_accum += 1
-            smoothed_points.append({"age_minutes": age_m, "velocity": 0.0, "views": views, "shares": shares, "saved": saved})
+            smoothed_points.append({"age_minutes": age_m, "velocity": 0.0, "views": views})
         else:
             if zero_accum > 0:
                 distributed_vel = vel / (zero_accum + 1)
@@ -70,10 +66,10 @@ def export_active_reel(output_path):
                 for i in range(len(smoothed_points) - zero_accum, len(smoothed_points)):
                     smoothed_points[i]["velocity"] = distributed_vel
                 # Add the current point
-                smoothed_points.append({"age_minutes": age_m, "velocity": distributed_vel, "views": views, "shares": shares, "saved": saved})
+                smoothed_points.append({"age_minutes": age_m, "velocity": distributed_vel, "views": views})
                 zero_accum = 0
             else:
-                smoothed_points.append({"age_minutes": age_m, "velocity": vel, "views": views, "shares": shares, "saved": saved})
+                smoothed_points.append({"age_minutes": age_m, "velocity": vel, "views": views})
     
     # 24-hour Projection
     # Uses accumulated views + projected decay of current velocity
@@ -82,44 +78,34 @@ def export_active_reel(output_path):
         current_age_minutes = smoothed_points[-1]["age_minutes"]
         remaining_minutes = max(0, 1440 - current_age_minutes)
         
-        # Determine archetype and calculate dynamically decaying half-life 
+        # Determine dynamically decaying half-life by comparing the 15m segments sequentially
         def calculate_decay_constant(target_points):
+            import math
+            baseline_half_life = 590.0
             if not target_points:
-                return math.log(2) / 590.0 # fallback
+                return math.log(2) / baseline_half_life
                 
-            cur_views = target_points[-1]["views"]
-            cur_shares = target_points[-1]["shares"]
-            
-            # recent velocity
+            # recent 15m segment
             recent_15 = target_points[-15:]
             v_recent = sum(p["velocity"] for p in recent_15) / len(recent_15) if recent_15 else 0
             
-            # previous 15 velocity
+            # previous 15m segment
             past_15 = target_points[-30:-15]
             v_past = sum(p["velocity"] for p in past_15) / len(past_15) if past_15 else 0
             
-            # 1. Trend-based adjustments (Look for inflection point)
-            acceleration = v_recent - v_past if v_past > 0 else 0
-            
-            # 2. Real-Time Engagement Ratios (Share to view)
-            share_ratio = (cur_shares / cur_views) if cur_views > 0 else 0.0
-            
-            # 3. Content Archetypes
-            baseline = 590.0
-            
-            if v_recent > 20 and acceleration < 0 and share_ratio < 0.005:
-                # "The Flash in the Pan": Massive early velocity, but slowing down and no one is sharing it. Hard Plateau.
-                baseline = 120.0
-            elif v_recent > 0 and acceleration >= 0 and share_ratio > 0.015:
-                # "The Exponential Viral": Growing velocity, high share retention.
-                baseline = 1200.0
+            # Segment-based Momentum Ratio
+            if v_past > 0:
+                momentum = v_recent / v_past
             else:
-                # "The Slow Burner" or Standard
-                momentum = (v_recent / v_past) if v_past > 0 else 1.0
-                momentum = max(0.5, min(momentum, 1.5)) # tighter clamp
-                baseline = 590.0 * momentum
+                momentum = 1.0 # If no previous segment vs current, base model applies
                 
-            return math.log(2) / baseline
+            # Clamp momentum to prevent wild exponential blowouts or flatlines
+            momentum = max(0.3, min(momentum, 2.0))
+            
+            # Establish decay rate based on previous cumulative segment acceleration
+            half_life_minutes = baseline_half_life * momentum
+            
+            return math.log(2) / half_life_minutes
 
         # Lookback window for velocity: average the last 15 minutes of velocity.
         recent_points = smoothed_points[-15:]
