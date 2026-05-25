@@ -37,7 +37,9 @@ def export_active_reel(output_path):
             p.velocity,
             r.caption,
             r.posted_at,
-            p.views
+            p.views,
+            p.shares,
+            p.saved
         FROM public.poll_metrics p
         JOIN public.reels r ON p.reel_id = r.id
         WHERE p.reel_id = %s
@@ -55,10 +57,12 @@ def export_active_reel(output_path):
         age_m = r[0]
         vel = r[1]
         views = r[4]
+        shares = r[5] or 0
+        saved = r[6] or 0
         
         if vel == 0:
             zero_accum += 1
-            smoothed_points.append({"age_minutes": age_m, "velocity": 0.0, "views": views}) # placeholder
+            smoothed_points.append({"age_minutes": age_m, "velocity": 0.0, "views": views, "shares": shares, "saved": saved})
         else:
             if zero_accum > 0:
                 distributed_vel = vel / (zero_accum + 1)
@@ -66,10 +70,10 @@ def export_active_reel(output_path):
                 for i in range(len(smoothed_points) - zero_accum, len(smoothed_points)):
                     smoothed_points[i]["velocity"] = distributed_vel
                 # Add the current point
-                smoothed_points.append({"age_minutes": age_m, "velocity": distributed_vel, "views": views})
+                smoothed_points.append({"age_minutes": age_m, "velocity": distributed_vel, "views": views, "shares": shares, "saved": saved})
                 zero_accum = 0
             else:
-                smoothed_points.append({"age_minutes": age_m, "velocity": vel, "views": views})
+                smoothed_points.append({"age_minutes": age_m, "velocity": vel, "views": views, "shares": shares, "saved": saved})
     
     # 24-hour Projection
     # Uses accumulated views + projected decay of current velocity
@@ -78,6 +82,45 @@ def export_active_reel(output_path):
         current_age_minutes = smoothed_points[-1]["age_minutes"]
         remaining_minutes = max(0, 1440 - current_age_minutes)
         
+        # Determine archetype and calculate dynamically decaying half-life 
+        def calculate_decay_constant(target_points):
+            if not target_points:
+                return math.log(2) / 590.0 # fallback
+                
+            cur_views = target_points[-1]["views"]
+            cur_shares = target_points[-1]["shares"]
+            
+            # recent velocity
+            recent_15 = target_points[-15:]
+            v_recent = sum(p["velocity"] for p in recent_15) / len(recent_15) if recent_15 else 0
+            
+            # previous 15 velocity
+            past_15 = target_points[-30:-15]
+            v_past = sum(p["velocity"] for p in past_15) / len(past_15) if past_15 else 0
+            
+            # 1. Trend-based adjustments (Look for inflection point)
+            acceleration = v_recent - v_past if v_past > 0 else 0
+            
+            # 2. Real-Time Engagement Ratios (Share to view)
+            share_ratio = (cur_shares / cur_views) if cur_views > 0 else 0.0
+            
+            # 3. Content Archetypes
+            baseline = 590.0
+            
+            if v_recent > 20 and acceleration < 0 and share_ratio < 0.005:
+                # "The Flash in the Pan": Massive early velocity, but slowing down and no one is sharing it. Hard Plateau.
+                baseline = 120.0
+            elif v_recent > 0 and acceleration >= 0 and share_ratio > 0.015:
+                # "The Exponential Viral": Growing velocity, high share retention.
+                baseline = 1200.0
+            else:
+                # "The Slow Burner" or Standard
+                momentum = (v_recent / v_past) if v_past > 0 else 1.0
+                momentum = max(0.5, min(momentum, 1.5)) # tighter clamp
+                baseline = 590.0 * momentum
+                
+            return math.log(2) / baseline
+
         # Lookback window for velocity: average the last 15 minutes of velocity.
         recent_points = smoothed_points[-15:]
         if recent_points:
@@ -85,29 +128,9 @@ def export_active_reel(output_path):
         else:
             current_velocity = 0
             
-        # Refined predictive decay based on analysis
-        # Velocity autocorrelation is ~0.85, audience temp leads by 3.5h (210m)
-        # Instead of straight /5.0, apply an exponential decay based on remaining time
         import math
         
-        # Calculate half-life dynamically: early spikes drop faster, mature videos decay slower.
-        # Empirically tuned to baseline ~590m optimal fit across complete 24h datasets 
-        baseline_half_life = 590.0
-        
-        # Momentum adjustment (if accelerating, stretch half-life to mimic algorithmic push)
-        momentum_ratio = 1.0
-        if len(smoothed_points) >= 30:
-            past_15 = smoothed_points[-30:-15]
-            if past_15:
-                past_velocity = sum(p["velocity"] for p in past_15) / len(past_15)
-                if past_velocity > 0:
-                    momentum_ratio = current_velocity / past_velocity
-                    
-        # Clamp momentum so we don't project infinite math
-        momentum_ratio = max(0.5, min(momentum_ratio, 2.0)) 
-        half_life_minutes = baseline_half_life * momentum_ratio
-        
-        decay_constant = math.log(2) / half_life_minutes
+        decay_constant = calculate_decay_constant(smoothed_points)
         
         # Integral of exponential decay V(t) = V0 * e^(-k*t) from 0 to remaining_minutes
         # = (V0 / k) * (1 - e^(-k*remaining_minutes))
@@ -135,10 +158,11 @@ def export_active_reel(output_path):
                 hist_velocity = 0
                 
             hist_remaining = max(0, 1440 - target_minute)
+            hist_decay_constant = calculate_decay_constant(target_points)
             
             # Apply same decay logic internally
-            if decay_constant > 0:
-                hist_future_views = (hist_velocity / decay_constant) * (1 - math.exp(-decay_constant * hist_remaining))
+            if hist_decay_constant > 0:
+                hist_future_views = (hist_velocity / hist_decay_constant) * (1 - math.exp(-hist_decay_constant * hist_remaining))
             else:
                 hist_future_views = hist_velocity * hist_remaining
                 
