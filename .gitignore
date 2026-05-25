@@ -27,10 +27,25 @@ MANIFEST
 venv/
 venv.bak/
 
-# Rust
-/target/
-**/*.rs.bk
-Cargo.lock
+# IDE / Editor
+.vscode/
+.idea/
+*.swp
+*.swo
 
-# macOS
+# OS generated files
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Hidden source code
+backend/
+
+db/
+
+deploy.sh
+requirements.txt
