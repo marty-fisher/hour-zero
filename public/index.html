@@ -108,19 +108,18 @@
             }
 
             if (data.predictions) {
-                document.getElementById('pred15m').innerText = data.predictions["15m"] ? Math.round(data.predictions["15m"]).toLocaleString() : "--";
-                document.getElementById('pred30m').innerText = data.predictions["30m"] ? Math.round(data.predictions["30m"]).toLocaleString() : "--";
-                document.getElementById('pred45m').innerText = data.predictions["45m"] ? Math.round(data.predictions["45m"]).toLocaleString() : "--";
-                document.getElementById('pred60m').innerText = data.predictions["60m"] ? Math.round(data.predictions["60m"]).toLocaleString() : "--";
-                document.getElementById('projectedViews').innerText = data.predictions["current"] ? Math.round(data.predictions["current"]).toLocaleString() : "--";
+                // Update final current prediction
+                document.getElementById('projectedViews').innerText = data.predictions["current"] 
+                    ? Math.round(data.predictions["current"]).toLocaleString() 
+                    : "--";
             }
-            
-            const points = data.current_trajectory;
-            if(points && points.length > 0) {
-                const latest = points[points.length - 1];               
-                document.getElementById('lastUpdated').innerText = `Tracker Age: ${latest.age_minutes}m`;
-                // Draw Chart
-                renderChart(points, data.predictions);
+
+            if (data.last_updated_minutes) {
+                document.getElementById('lastUpdated').innerText = `Last Updated: ${data.last_updated_minutes}m`;
+            }
+
+            if (data.current_trajectory && data.current_trajectory.length > 0) {
+                renderChart(data.current_trajectory, data.predictions);
             }
         }
 
