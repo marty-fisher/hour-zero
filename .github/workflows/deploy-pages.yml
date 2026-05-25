@@ -1,0 +1,67 @@
+name: Deploy hour-zero Dashboard
+
+on:
+  # Run on changes to the static site or export script
+  push:
+    branches: ["main"]
+    paths:
+      - "public/**"
+      - "scripts/ops/export_static_data.py"
+      - ".github/workflows/deploy-pages.yml"
+  
+  # Run automatically every 15 minutes to keep data fresh
+  schedule:
+    - cron: "*/15 * * * *"
+  
+  # Allow manual trigger from the GitHub Actions tab
+  workflow_dispatch:
+
+# Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Allow only one concurrent deployment
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install psycopg2-binary python-dotenv
+
+      - name: Export Live Data
+        env:
+          # This pulls the connection string securely from GitHub repository secrets
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          python scripts/ops/export_static_data.py --output public/data.json
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: './public'
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
