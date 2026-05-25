@@ -58,7 +58,7 @@ def export_active_reel(output_path):
         
         if vel == 0:
             zero_accum += 1
-            smoothed_points.append({"age_minutes": age_m, "velocity": 0.0}) # placeholder
+            smoothed_points.append({"age_minutes": age_m, "velocity": 0.0, "views": views}) # placeholder
         else:
             if zero_accum > 0:
                 distributed_vel = vel / (zero_accum + 1)
@@ -66,10 +66,10 @@ def export_active_reel(output_path):
                 for i in range(len(smoothed_points) - zero_accum, len(smoothed_points)):
                     smoothed_points[i]["velocity"] = distributed_vel
                 # Add the current point
-                smoothed_points.append({"age_minutes": age_m, "velocity": distributed_vel})
+                smoothed_points.append({"age_minutes": age_m, "velocity": distributed_vel, "views": views})
                 zero_accum = 0
             else:
-                smoothed_points.append({"age_minutes": age_m, "velocity": vel})
+                smoothed_points.append({"age_minutes": age_m, "velocity": vel, "views": views})
     
     # 24-hour Projection
     # Uses accumulated views + projected decay of current velocity

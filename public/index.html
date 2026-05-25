@@ -196,11 +196,7 @@
             // Cumulative Chart
             const cumulativeCtx = document.getElementById('cumulativeChart').getContext('2d');
             const allLabels = points.map(p => `${p.age_minutes}m`);
-            let accum = 0;
-            const cumulativeData = points.map(p => {
-                accum += p.velocity;
-                return accum;
-            });
+            const cumulativeData = points.map(p => p.views);
 
             if (cumulativeChartInstance) {
                 cumulativeChartInstance.destroy();
