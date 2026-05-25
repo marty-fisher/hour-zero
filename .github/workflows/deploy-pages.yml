@@ -79,7 +79,9 @@ jobs:
               query = """
                   SELECT
                       EXTRACT(EPOCH FROM (p.polled_at - r.posted_at))::INT / 60 AS age_minutes,
-                      p.velocity
+                      p.velocity,
+                      r.caption,
+                      r.posted_at
                   FROM public.poll_metrics p
                   JOIN public.reels r ON p.reel_id = r.id
                   WHERE p.reel_id = %s
@@ -106,8 +108,14 @@ jobs:
                           smoothed_points.append({"age_minutes": age_m, "velocity": vel})
               
               projected_final_views = smoothed_points[-1]["velocity"] * 1440 if smoothed_points and smoothed_points[-1]["velocity"] else 0
+              
+              caption = rows[0][2] if rows else ""
+              posted_at = rows[0][3].isoformat() if rows and rows[0][3] else ""
+              
               payload = {
                   "reel_id": active_id,
+                  "caption": caption,
+                  "posted_at": posted_at,
                   "current_trajectory": smoothed_points,
                   "24h_predicted_views": projected_final_views,
                   "last_updated_minutes": rows[-1][0] if rows else None
