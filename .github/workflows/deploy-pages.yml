@@ -49,10 +49,7 @@ jobs:
         env:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: |
-          # Fetch the raw export script securely at runtime since it isn't tracked in the public repo
-          curl -H "Authorization: token ${{ secrets.GH_PAT }}" -O https://raw.githubusercontent.com/marty-fisher/hour-zero/main/scripts/ops/export_static_data.py || true
-          
-          # If curl fails because the file isn't public, write the script explicitly in CI
+          # Write the script explicitly in CI because it is removed from public tracking
           cat << 'EOF' > export_static_data.py
           import argparse
           import os
