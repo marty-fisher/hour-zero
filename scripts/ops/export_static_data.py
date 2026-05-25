@@ -83,8 +83,32 @@ def export_active_reel(output_path):
         # For a rough approximation, we'll assume the average velocity over the remaining period is half the current velocity
         avg_velocity_remaining = current_velocity / 2.0
         projected_final_views = current_views + (avg_velocity_remaining * remaining_minutes)
+        
+        # Generate historical predictions (15m, 30m, 45m)
+        def predict_at_minute(target_minute):
+            target_points = [p for p in smoothed_points if p["age_minutes"] <= target_minute]
+            # Find nearest row to get views at that time
+            target_row = next((r for r in reversed(rows) if r[0] <= target_minute), None)
+            
+            if not target_points or not target_row:
+                return None
+                
+            hist_views = target_row[4]
+            hist_velocity = target_points[-1]["velocity"] or 0
+            hist_remaining = max(0, 1440 - target_minute)
+            return hist_views + ((hist_velocity / 2.0) * hist_remaining)
+
+        pred_15m = predict_at_minute(15)
+        pred_30m = predict_at_minute(30)
+        pred_45m = predict_at_minute(45)
+
     else:
+        current_views = 0
+        current_age_minutes = 0
         projected_final_views = 0
+        pred_15m = None
+        pred_30m = None
+        pred_45m = None
     
     caption = rows[0][2] if rows else ""
     posted_at = rows[0][3].isoformat() if rows and rows[0][3] else ""
@@ -94,7 +118,15 @@ def export_active_reel(output_path):
         "caption": caption,
         "posted_at": posted_at,
         "current_trajectory": smoothed_points,
+        "current_views": current_views,
+        "age_minutes": current_age_minutes,
         "24h_predicted_views": projected_final_views,
+        "predictions": {
+            "15m": pred_15m,
+            "30m": pred_30m,
+            "45m": pred_45m,
+            "current": projected_final_views
+        },
         "last_updated_minutes": rows[-1][0] if rows else None
     }
     

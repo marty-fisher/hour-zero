@@ -21,14 +21,37 @@
                 <h2 id="captionDisplay" class="text-lg font-bold text-gray-200 break-words leading-tight whitespace-pre-line">Loading...</h2>
                 <div id="datePostedDisplay" class="text-xs text-gray-400 mt-1"></div>
             </div>
-            <div class="grid grid-cols-2 gap-4">
+            
+            <div class="grid grid-cols-2 gap-4 mb-4 pb-4 border-b border-gray-700">
                 <div>
-                    <span class="block text-sm text-gray-400 mb-1">Current VPM</span>
-                    <span id="currentVpm" class="text-2xl font-bold text-white">--</span>
+                    <span class="block text-sm text-gray-400 mb-1">Age</span>
+                    <span id="currentAge" class="text-2xl font-bold text-white">--</span>
                 </div>
                 <div>
-                    <span class="block text-sm text-gray-400 mb-1">24h Projection</span>
-                    <span id="projectedViews" class="text-2xl font-bold text-green-400">--</span>
+                    <span class="block text-sm text-gray-400 mb-1">Current Views</span>
+                    <span id="currentViews" class="text-2xl font-bold text-white">--</span>
+                </div>
+            </div>
+
+            <div>
+                <span class="block text-sm text-gray-400 mb-2">24h Projection History</span>
+                <div class="grid grid-cols-3 gap-2 text-center border-b border-gray-700 pb-3 mb-3">
+                    <div class="bg-gray-700/50 rounded p-2">
+                        <span class="block text-xs text-gray-400">@ 15m</span>
+                        <span id="pred15m" class="text-lg font-bold text-blue-300">--</span>
+                    </div>
+                    <div class="bg-gray-700/50 rounded p-2">
+                        <span class="block text-xs text-gray-400">@ 30m</span>
+                        <span id="pred30m" class="text-lg font-bold text-blue-300">--</span>
+                    </div>
+                    <div class="bg-gray-700/50 rounded p-2">
+                        <span class="block text-xs text-gray-400">@ 45m</span>
+                        <span id="pred45m" class="text-lg font-bold text-blue-300">--</span>
+                    </div>
+                </div>
+                <div class="text-center bg-gray-800/80 rounded p-3 border border-gray-600 shadow-inner">
+                    <span class="block text-sm text-gray-400 mb-1">Current 24h Prediction</span>
+                    <span id="projectedViews" class="text-3xl font-bold text-green-400">--</span>
                 </div>
             </div>
         </div>
@@ -95,15 +118,26 @@
                 document.getElementById('datePostedDisplay').innerText = `Posted: ${date.toLocaleString()}`;
             }
             
+            if (data.age_minutes !== undefined) {
+                const hours = Math.floor(data.age_minutes / 60);
+                const minutes = data.age_minutes % 60;
+                document.getElementById('currentAge').innerText = `${hours}h ${minutes}m`;
+            }
+
+            if (data.current_views !== undefined) {
+                document.getElementById('currentViews').innerText = data.current_views.toLocaleString();
+            }
+
+            if (data.predictions) {
+                document.getElementById('pred15m').innerText = data.predictions["15m"] ? Math.round(data.predictions["15m"]).toLocaleString() : "--";
+                document.getElementById('pred30m').innerText = data.predictions["30m"] ? Math.round(data.predictions["30m"]).toLocaleString() : "--";
+                document.getElementById('pred45m').innerText = data.predictions["45m"] ? Math.round(data.predictions["45m"]).toLocaleString() : "--";
+                document.getElementById('projectedViews').innerText = data.predictions["current"] ? Math.round(data.predictions["current"]).toLocaleString() : "--";
+            }
+            
             const points = data.current_trajectory;
             if(points && points.length > 0) {
-                const latest = points[points.length - 1];
-                document.getElementById('currentVpm').innerText = latest.velocity ? latest.velocity.toFixed(2) : "0.0";
-                
-                if(data['24h_predicted_views']) {
-                    document.getElementById('projectedViews').innerText = Math.round(data['24h_predicted_views']).toLocaleString();
-                }
-
+                const latest = points[points.length - 1];               
                 document.getElementById('lastUpdated').innerText = `Tracker Age: ${latest.age_minutes}m`;
                 // Draw Chart
                 renderChart(points);
