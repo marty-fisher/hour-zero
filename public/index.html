@@ -34,7 +34,7 @@
 
             <div>
                 <span class="block text-sm text-gray-400 mb-2">24h Projection History</span>
-                <div class="grid grid-cols-3 gap-2 text-center border-b border-gray-700 pb-3 mb-3">
+                <div class="grid grid-cols-4 gap-2 text-center border-b border-gray-700 pb-3 mb-3">
                     <div class="bg-gray-700/50 rounded p-2">
                         <span class="block text-xs text-gray-400">@ 15m</span>
                         <span id="pred15m" class="text-lg font-bold text-blue-300">--</span>
@@ -46,6 +46,10 @@
                     <div class="bg-gray-700/50 rounded p-2">
                         <span class="block text-xs text-gray-400">@ 45m</span>
                         <span id="pred45m" class="text-lg font-bold text-blue-300">--</span>
+                    </div>
+                    <div class="bg-gray-700/50 rounded p-2">
+                        <span class="block text-xs text-gray-400">@ 60m</span>
+                        <span id="pred60m" class="text-lg font-bold text-blue-300">--</span>
                     </div>
                 </div>
                 <div class="text-center bg-gray-800/80 rounded p-3 border border-gray-600 shadow-inner">
@@ -128,6 +132,7 @@
                 document.getElementById('pred15m').innerText = data.predictions["15m"] ? Math.round(data.predictions["15m"]).toLocaleString() : "--";
                 document.getElementById('pred30m').innerText = data.predictions["30m"] ? Math.round(data.predictions["30m"]).toLocaleString() : "--";
                 document.getElementById('pred45m').innerText = data.predictions["45m"] ? Math.round(data.predictions["45m"]).toLocaleString() : "--";
+                document.getElementById('pred60m').innerText = data.predictions["60m"] ? Math.round(data.predictions["60m"]).toLocaleString() : "--";
                 document.getElementById('projectedViews').innerText = data.predictions["current"] ? Math.round(data.predictions["current"]).toLocaleString() : "--";
             }
             

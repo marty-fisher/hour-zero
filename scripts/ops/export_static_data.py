@@ -112,6 +112,7 @@ def export_active_reel(output_path):
         pred_15m = predict_at_minute(15)
         pred_30m = predict_at_minute(30)
         pred_45m = predict_at_minute(45)
+        pred_60m = predict_at_minute(60)
 
     else:
         current_views = 0
@@ -120,6 +121,7 @@ def export_active_reel(output_path):
         pred_15m = None
         pred_30m = None
         pred_45m = None
+        pred_60m = None
     
     caption = rows[0][2] if rows else ""
     posted_at = rows[0][3].isoformat() if rows and rows[0][3] else ""
@@ -136,6 +138,7 @@ def export_active_reel(output_path):
             "15m": pred_15m,
             "30m": pred_30m,
             "45m": pred_45m,
+            "60m": pred_60m,
             "current": projected_final_views
         },
         "last_updated_minutes": rows[-1][0] if rows else None
