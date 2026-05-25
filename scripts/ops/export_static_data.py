@@ -77,11 +77,17 @@ def export_active_reel(output_path):
         current_views = rows[-1][4]
         current_age_minutes = smoothed_points[-1]["age_minutes"]
         remaining_minutes = max(0, 1440 - current_age_minutes)
-        current_velocity = smoothed_points[-1]["velocity"] or 0
         
+        # Lookback window for velocity: average the last 15 minutes of velocity.
+        recent_points = smoothed_points[-15:]
+        if recent_points:
+            current_velocity = sum(p["velocity"] for p in recent_points) / len(recent_points)
+        else:
+            current_velocity = 0
+            
         # Simple decay curve: assume velocity halves every few hours.
-        # For a rough approximation, we'll assume the average velocity over the remaining period is half the current velocity
-        avg_velocity_remaining = current_velocity / 2.0
+        # Use V/5 to prevent blowing out early spikes
+        avg_velocity_remaining = current_velocity / 5.0
         projected_final_views = current_views + (avg_velocity_remaining * remaining_minutes)
         
         # Generate historical predictions (15m, 30m, 45m)
@@ -94,9 +100,14 @@ def export_active_reel(output_path):
                 return None
                 
             hist_views = target_row[4]
-            hist_velocity = target_points[-1]["velocity"] or 0
+            hist_recent = target_points[-15:]
+            if hist_recent:
+                hist_velocity = sum(p["velocity"] for p in hist_recent) / len(hist_recent)
+            else:
+                hist_velocity = 0
+                
             hist_remaining = max(0, 1440 - target_minute)
-            return hist_views + ((hist_velocity / 2.0) * hist_remaining)
+            return hist_views + ((hist_velocity / 5.0) * hist_remaining)
 
         pred_15m = predict_at_minute(15)
         pred_30m = predict_at_minute(30)
