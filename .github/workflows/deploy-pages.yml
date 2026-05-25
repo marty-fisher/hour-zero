@@ -97,16 +97,16 @@ jobs:
                   age_m, vel, views = r[0], r[1], r[4]
                   if vel == 0:
                       zero_accum += 1
-                      smoothed_points.append({"age_minutes": age_m, "velocity": 0.0})
+                      smoothed_points.append({"age_minutes": age_m, "velocity": 0.0, "views": views})
                   else:
                       if zero_accum > 0:
                           distributed_vel = vel / (zero_accum + 1)
                           for i in range(len(smoothed_points) - zero_accum, len(smoothed_points)):
                               smoothed_points[i]["velocity"] = distributed_vel
-                          smoothed_points.append({"age_minutes": age_m, "velocity": distributed_vel})
+                          smoothed_points.append({"age_minutes": age_m, "velocity": distributed_vel, "views": views})
                           zero_accum = 0
                       else:
-                          smoothed_points.append({"age_minutes": age_m, "velocity": vel})
+                          smoothed_points.append({"age_minutes": age_m, "velocity": vel, "views": views})
               
               if smoothed_points and rows:
                   current_views = rows[-1][4]
@@ -160,9 +160,13 @@ jobs:
                   pred_30m = None
                   pred_45m = None
                   pred_60m = None
+                  
+              caption = rows[0][2] if rows else ""
+              posted_at = rows[0][3].isoformat() if rows and rows[0][3] else ""
               
               payload = {
                   "reel_id": active_id,
+                  "caption": caption,
                   "posted_at": posted_at,
                   "current_trajectory": smoothed_points,
                   "current_views": current_views,
