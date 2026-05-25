@@ -62,6 +62,9 @@ jobs:
               db_url = os.getenv('SUPABASE_DB_URL')
               if not db_url: return
               
+              # Clean any accidental trailing newlines from GitHub Secrets
+              db_url = db_url.strip()
+              
               # Add SSL requirement for Supabase
               if "?sslmode=" not in db_url:
                   db_url += "?sslmode=require"
