@@ -141,13 +141,13 @@
                 const latest = points[points.length - 1];               
                 document.getElementById('lastUpdated').innerText = `Tracker Age: ${latest.age_minutes}m`;
                 // Draw Chart
-                renderChart(points);
+                renderChart(points, data.predictions);
             }
         }
 
         let chartInstance = null;
         let cumulativeChartInstance = null;
-        function renderChart(points) {
+        function renderChart(points, predictions) {
             const first90mPoints = points.filter(p => p.age_minutes <= 90);
             
             const ctx = document.getElementById('velocityChart').getContext('2d');
@@ -195,8 +195,132 @@
 
             // Cumulative Chart
             const cumulativeCtx = document.getElementById('cumulativeChart').getContext('2d');
-            const allLabels = points.map(p => `${p.age_minutes}m`);
-            const cumulativeData = points.map(p => p.views);
+            
+            // Build x-axis up to 24 hours (1440 mins) at reasonable intervals (e.g. 15min)
+            const allLabels = [];
+            for (let i = 0; i <= 1440; i += 15) {
+                allLabels.push(`${i}m`);
+            }
+            
+            // Map true data to these labels
+            const getTrueData = (min) => {
+                // Find nearest point within this interval
+                const pt = points.find(p => p.age_minutes >= min && p.age_minutes < min + 15);
+                if (pt) return pt.views;
+                
+                // If past our current tracking max or before 0, return null
+                if (points.length && min > points[points.length-1].age_minutes) return null;
+                
+                // Find nearest match backwards for fill
+                const prev = points.filter(p => p.age_minutes <= min);
+                if (prev.length > 0) return prev[prev.length - 1].views;
+                return 0;
+            };
+
+            const cumulativeData = [];
+            for (let i = 0; i <= 1440; i += 15) {
+                cumulativeData.push(getTrueData(i));
+            }
+            
+            // Helper to build projection lines
+            const createProjectionLine = (currentViews, predictedFinalViews, currentMins) => {
+                return allLabels.map(labelStr => {
+                    const min = parseInt(labelStr.replace('m',''));
+                    if (min < currentMins) return null; // Only project forward
+                    if (min === currentMins) return currentViews; // Start from current
+                    
+                    // Simple linear interpolation to the 24h mark
+                    const remainingMinsTotal = 1440 - currentMins;
+                    const elapsedMinsSinceProj = min - currentMins;
+                    const predictedAdditionalViews = predictedFinalViews - currentViews;
+                    
+                    const viewsAtMin = currentViews + (predictedAdditionalViews * (elapsedMinsSinceProj / remainingMinsTotal));
+                    return viewsAtMin;
+                });
+            };
+
+            const datasets = [{
+                label: 'True Views',
+                data: cumulativeData,
+                borderColor: 'rgb(52, 211, 153)', // Tailwind emerald-400
+                backgroundColor: 'rgba(52, 211, 153, 0.1)',
+                borderWidth: 3,
+                pointRadius: 0, // hide dots for smooth line
+                fill: true,
+                tension: 0.4,
+                z: 10 // bring to front
+            }];
+
+            if (predictions) {
+                // Get starting point views for each prediction
+                const valAt15 = getTrueData(15);
+                if (valAt15 && predictions["15m"]) {
+                    datasets.push({
+                        label: 'Proj @ 15m',
+                        data: createProjectionLine(valAt15, predictions["15m"], 15),
+                        borderColor: 'rgba(96, 165, 250, 0.4)', // blue-400 faded
+                        borderWidth: 1,
+                        borderDash: [5, 5],
+                        pointRadius: 0,
+                        fill: false
+                    });
+                }
+                
+                const valAt30 = getTrueData(30);
+                if (valAt30 && predictions["30m"]) {
+                    datasets.push({
+                        label: 'Proj @ 30m',
+                        data: createProjectionLine(valAt30, predictions["30m"], 30),
+                        borderColor: 'rgba(167, 139, 250, 0.4)', // purple-400 faded
+                        borderWidth: 1,
+                        borderDash: [5, 5],
+                        pointRadius: 0,
+                        fill: false
+                    });
+                }
+
+                const valAt45 = getTrueData(45);
+                if (valAt45 && predictions["45m"]) {
+                    datasets.push({
+                        label: 'Proj @ 45m',
+                        data: createProjectionLine(valAt45, predictions["45m"], 45),
+                        borderColor: 'rgba(244, 114, 182, 0.4)', // pink-400 faded
+                        borderWidth: 1,
+                        borderDash: [5, 5],
+                        pointRadius: 0,
+                        fill: false
+                    });
+                }
+
+                const valAt60 = getTrueData(60);
+                if (valAt60 && predictions["60m"]) {
+                    datasets.push({
+                        label: 'Proj @ 60m',
+                        data: createProjectionLine(valAt60, predictions["60m"], 60),
+                        borderColor: 'rgba(251, 146, 60, 0.4)', // orange-400 faded
+                        borderWidth: 1,
+                        borderDash: [5, 5],
+                        pointRadius: 0,
+                        fill: false
+                    });
+                }
+                
+                if (points.length > 0 && predictions["current"]) {
+                    const latest = points[points.length - 1];
+                    // Find nearest 15m interval for the "current" projection line start
+                    const currentMins = Math.floor(latest.age_minutes / 15) * 15;
+                    datasets.push({
+                        label: 'Current Proj',
+                        data: createProjectionLine(latest.views, predictions["current"], currentMins),
+                        borderColor: 'rgba(250, 204, 21, 0.8)', // yellow-400
+                        borderWidth: 2,
+                        borderDash: [5, 5],
+                        pointRadius: 0,
+                        fill: false,
+                        z: 5
+                    });
+                }
+            }
 
             if (cumulativeChartInstance) {
                 cumulativeChartInstance.destroy();
@@ -206,27 +330,35 @@
                 type: 'line',
                 data: {
                     labels: allLabels,
-                    datasets: [{
-                        label: 'Cumulative Views',
-                        data: cumulativeData,
-                        borderColor: 'rgb(52, 211, 153)', // Tailwind emerald-400
-                        backgroundColor: 'rgba(52, 211, 153, 0.1)',
-                        borderWidth: 2,
-                        pointRadius: 1,
-                        fill: true,
-                        tension: 0.4
-                    }]
+                    datasets: datasets
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
                     plugins: {
-                        legend: { display: false }
+                        legend: { 
+                            display: true,
+                            position: 'bottom',
+                            labels: {
+                                color: '#9ca3af',
+                                usePointStyle: true,
+                                boxWidth: 6
+                            }
+                        }
                     },
                     scales: {
                         x: {
                             grid: { color: 'rgba(255, 255, 255, 0.1)' },
-                            ticks: { color: '#9ca3af', maxTicksLimit: 6 }
+                            ticks: { 
+                                color: '#9ca3af',
+                                maxTicksLimit: 8,
+                                callback: function(value, index, values) {
+                                    // only show hours
+                                    const min = parseInt(this.getLabelForValue(value).replace('m',''));
+                                    if (min % 120 === 0) return `${min/60}h`; 
+                                    return '';
+                                }
+                            }
                         },
                         y: {
                             grid: { color: 'rgba(255, 255, 255, 0.1)' },
