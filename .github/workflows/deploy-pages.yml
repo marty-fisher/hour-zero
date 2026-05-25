@@ -121,7 +121,19 @@ jobs:
                       current_velocity = 0
                       
                   import math
-                  half_life_minutes = 180.0
+                  
+                  baseline_half_life = 590.0
+                  momentum_ratio = 1.0
+                  if len(smoothed_points) >= 30:
+                      past_15 = smoothed_points[-30:-15]
+                      if past_15:
+                          past_velocity = sum(p["velocity"] for p in past_15) / len(past_15)
+                          if past_velocity > 0:
+                              momentum_ratio = current_velocity / past_velocity
+                              
+                  momentum_ratio = max(0.5, min(momentum_ratio, 2.0)) 
+                  half_life_minutes = baseline_half_life * momentum_ratio
+                  
                   decay_constant = math.log(2) / half_life_minutes
                   
                   if decay_constant > 0:

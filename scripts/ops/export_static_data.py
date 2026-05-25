@@ -91,8 +91,22 @@ def export_active_reel(output_path):
         import math
         
         # Calculate half-life dynamically: early spikes drop faster, mature videos decay slower.
-        # Use 180 min half-life as baseline for Instagram's algorithmic reach window
-        half_life_minutes = 180.0
+        # Empirically tuned to baseline ~590m optimal fit across complete 24h datasets 
+        baseline_half_life = 590.0
+        
+        # Momentum adjustment (if accelerating, stretch half-life to mimic algorithmic push)
+        momentum_ratio = 1.0
+        if len(smoothed_points) >= 30:
+            past_15 = smoothed_points[-30:-15]
+            if past_15:
+                past_velocity = sum(p["velocity"] for p in past_15) / len(past_15)
+                if past_velocity > 0:
+                    momentum_ratio = current_velocity / past_velocity
+                    
+        # Clamp momentum so we don't project infinite math
+        momentum_ratio = max(0.5, min(momentum_ratio, 2.0)) 
+        half_life_minutes = baseline_half_life * momentum_ratio
+        
         decay_constant = math.log(2) / half_life_minutes
         
         # Integral of exponential decay V(t) = V0 * e^(-k*t) from 0 to remaining_minutes
