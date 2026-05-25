@@ -222,103 +222,120 @@
                 cumulativeData.push(getTrueData(i));
             }
             
-            // Helper to build projection lines
-            const createProjectionLine = (currentViews, predictedFinalViews, currentMins) => {
-                return allLabels.map(labelStr => {
-                    const min = parseInt(labelStr.replace('m',''));
-                    if (min < currentMins) return null; // Only project forward
-                    if (min === currentMins) return currentViews; // Start from current
-                    
-                    // Simple linear interpolation to the 24h mark
-                    const remainingMinsTotal = 1440 - currentMins;
-                    const elapsedMinsSinceProj = min - currentMins;
-                    const predictedAdditionalViews = predictedFinalViews - currentViews;
-                    
-                    const viewsAtMin = currentViews + (predictedAdditionalViews * (elapsedMinsSinceProj / remainingMinsTotal));
-                    return viewsAtMin;
-                });
-            };
-
-            const datasets = [{
-                label: 'True Views',
-                data: cumulativeData,
-                borderColor: 'rgb(52, 211, 153)', // Tailwind emerald-400
-                backgroundColor: 'rgba(52, 211, 153, 0.1)',
-                borderWidth: 3,
-                pointRadius: 0, // hide dots for smooth line
-                fill: true,
-                tension: 0.4,
-                z: 10 // bring to front
-            }];
-
+            // Render predictions iteratively if predictions exist
             if (predictions) {
-                // Get starting point views for each prediction
-                const valAt15 = getTrueData(15);
-                if (valAt15 && predictions["15m"]) {
-                    datasets.push({
-                        label: 'Proj @ 15m',
-                        data: createProjectionLine(valAt15, predictions["15m"], 15),
-                        borderColor: 'rgba(96, 165, 250, 0.4)', // blue-400 faded
-                        borderWidth: 1,
-                        borderDash: [5, 5],
-                        pointRadius: 0,
-                        fill: false
-                    });
-                }
+                // To accurately render exponential curves from the backend, we recalculate the curve based on the formula
+                // since the backend only provides the final 24h number.
+                const baseline_half_life = 590.0;
+                let decay_constant = Math.log(2) / baseline_half_life; // We use the baseline, backend uses dynamic but this creates the visual curve.
                 
-                const valAt30 = getTrueData(30);
-                if (valAt30 && predictions["30m"]) {
-                    datasets.push({
-                        label: 'Proj @ 30m',
-                        data: createProjectionLine(valAt30, predictions["30m"], 30),
-                        borderColor: 'rgba(167, 139, 250, 0.4)', // purple-400 faded
-                        borderWidth: 1,
-                        borderDash: [5, 5],
-                        pointRadius: 0,
-                        fill: false
+                const createProjectionLine = (currentViews, predictedFinalViews, currentMins) => {
+                    return allLabels.map(labelStr => {
+                        const min = parseInt(labelStr.replace('m',''));
+                        if (min < currentMins) return null; // Only project forward
+                        if (min === currentMins) return currentViews; // Start from current
+                        
+                        // We must reconstruct the exponential curve up to the final target
+                        // The backend gave us `predictedFinalViews` at 1440m.
+                        // We'll interpolate using the exponential shape instead of straight lines.
+                        
+                        const remainingMinsTotal = 1440 - currentMins;
+                        const elapsedMinsSinceProj = min - currentMins;
+                        const predictedAdditionalViews = predictedFinalViews - currentViews;
+                        
+                        // the ratio of accumulation at time `t` over total accumulation at 24h
+                        // Accum(t) = (V0/k) * (1 - e^-kt)
+                        // Accum(24h) = (V0/k) * (1 - e^-k*total)
+                        // Ratio = (1 - e^-kt) / (1 - e^-k*total)
+                        
+                        const ratio = (1 - Math.exp(-decay_constant * elapsedMinsSinceProj)) / (1 - Math.exp(-decay_constant * remainingMinsTotal));
+                        
+                        const viewsAtMin = currentViews + (predictedAdditionalViews * ratio);
+                        return viewsAtMin;
                     });
-                }
+                };
 
-                const valAt45 = getTrueData(45);
-                if (valAt45 && predictions["45m"]) {
-                    datasets.push({
-                        label: 'Proj @ 45m',
-                        data: createProjectionLine(valAt45, predictions["45m"], 45),
-                        borderColor: 'rgba(244, 114, 182, 0.4)', // pink-400 faded
-                        borderWidth: 1,
-                        borderDash: [5, 5],
-                        pointRadius: 0,
-                        fill: false
-                    });
-                }
+                const datasets = [{
+                    label: 'True Views',
+                    data: cumulativeData,
+                    borderColor: 'rgb(52, 211, 153)', // Tailwind emerald-400
+                    backgroundColor: 'rgba(52, 211, 153, 0.1)',
+                    borderWidth: 3,
+                    pointRadius: 0, // hide dots for smooth line
+                    fill: true,
+                    tension: 0.4,
+                    z: 10 // bring to front
+                }];
 
-                const valAt60 = getTrueData(60);
-                if (valAt60 && predictions["60m"]) {
-                    datasets.push({
-                        label: 'Proj @ 60m',
-                        data: createProjectionLine(valAt60, predictions["60m"], 60),
-                        borderColor: 'rgba(251, 146, 60, 0.4)', // orange-400 faded
-                        borderWidth: 1,
-                        borderDash: [5, 5],
-                        pointRadius: 0,
-                        fill: false
-                    });
-                }
-                
-                if (points.length > 0 && predictions["current"]) {
-                    const latest = points[points.length - 1];
-                    // Find nearest 15m interval for the "current" projection line start
-                    const currentMins = Math.floor(latest.age_minutes / 15) * 15;
-                    datasets.push({
-                        label: 'Current Proj',
-                        data: createProjectionLine(latest.views, predictions["current"], currentMins),
-                        borderColor: 'rgba(250, 204, 21, 0.8)', // yellow-400
-                        borderWidth: 2,
-                        borderDash: [5, 5],
-                        pointRadius: 0,
-                        fill: false,
-                        z: 5
-                    });
+                if (predictions) {
+                    // Get starting point views for each prediction
+                    const valAt15 = getTrueData(15);
+                    if (valAt15 && predictions["15m"]) {
+                        datasets.push({
+                            label: 'Proj @ 15m',
+                            data: createProjectionLine(valAt15, predictions["15m"], 15),
+                            borderColor: 'rgba(96, 165, 250, 0.4)', // blue-400 faded
+                            borderWidth: 1,
+                            borderDash: [5, 5],
+                            pointRadius: 0,
+                            fill: false
+                        });
+                    }
+                    
+                    const valAt30 = getTrueData(30);
+                    if (valAt30 && predictions["30m"]) {
+                        datasets.push({
+                            label: 'Proj @ 30m',
+                            data: createProjectionLine(valAt30, predictions["30m"], 30),
+                            borderColor: 'rgba(167, 139, 250, 0.4)', // purple-400 faded
+                            borderWidth: 1,
+                            borderDash: [5, 5],
+                            pointRadius: 0,
+                            fill: false
+                        });
+                    }
+
+                    const valAt45 = getTrueData(45);
+                    if (valAt45 && predictions["45m"]) {
+                        datasets.push({
+                            label: 'Proj @ 45m',
+                            data: createProjectionLine(valAt45, predictions["45m"], 45),
+                            borderColor: 'rgba(244, 114, 182, 0.4)', // pink-400 faded
+                            borderWidth: 1,
+                            borderDash: [5, 5],
+                            pointRadius: 0,
+                            fill: false
+                        });
+                    }
+
+                    const valAt60 = getTrueData(60);
+                    if (valAt60 && predictions["60m"]) {
+                        datasets.push({
+                            label: 'Proj @ 60m',
+                            data: createProjectionLine(valAt60, predictions["60m"], 60),
+                            borderColor: 'rgba(251, 146, 60, 0.4)', // orange-400 faded
+                            borderWidth: 1,
+                            borderDash: [5, 5],
+                            pointRadius: 0,
+                            fill: false
+                        });
+                    }
+                    
+                    if (points.length > 0 && predictions["current"]) {
+                        const latest = points[points.length - 1];
+                        // Find nearest 15m interval for the "current" projection line start
+                        const currentMins = Math.floor(latest.age_minutes / 15) * 15;
+                        datasets.push({
+                            label: 'Current Proj',
+                            data: createProjectionLine(latest.views, predictions["current"], currentMins),
+                            borderColor: 'rgba(250, 204, 21, 0.8)', // yellow-400
+                            borderWidth: 2,
+                            borderDash: [5, 5],
+                            pointRadius: 0,
+                            fill: false,
+                            z: 5
+                        });
+                    }
                 }
             }
 
