@@ -81,7 +81,8 @@ jobs:
                       EXTRACT(EPOCH FROM (p.polled_at - r.posted_at))::INT / 60 AS age_minutes,
                       p.velocity,
                       r.caption,
-                      r.posted_at
+                      r.posted_at,
+                      p.views
                   FROM public.poll_metrics p
                   JOIN public.reels r ON p.reel_id = r.id
                   WHERE p.reel_id = %s
@@ -93,7 +94,7 @@ jobs:
               smoothed_points = []
               zero_accum = 0
               for r in rows:
-                  age_m, vel = r[0], r[1]
+                  age_m, vel, views = r[0], r[1], r[4]
                   if vel == 0:
                       zero_accum += 1
                       smoothed_points.append({"age_minutes": age_m, "velocity": 0.0})
@@ -107,7 +108,16 @@ jobs:
                       else:
                           smoothed_points.append({"age_minutes": age_m, "velocity": vel})
               
-              projected_final_views = smoothed_points[-1]["velocity"] * 1440 if smoothed_points and smoothed_points[-1]["velocity"] else 0
+              if smoothed_points and rows:
+                  current_views = rows[-1][4]
+                  current_age_minutes = smoothed_points[-1]["age_minutes"]
+                  remaining_minutes = max(0, 1440 - current_age_minutes)
+                  current_velocity = smoothed_points[-1]["velocity"] or 0
+                  
+                  avg_velocity_remaining = current_velocity / 2.0
+                  projected_final_views = current_views + (avg_velocity_remaining * remaining_minutes)
+              else:
+                  projected_final_views = 0
               
               caption = rows[0][2] if rows else ""
               posted_at = rows[0][3].isoformat() if rows and rows[0][3] else ""
