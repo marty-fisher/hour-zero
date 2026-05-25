@@ -5,11 +5,15 @@ import psycopg2
 from dotenv import load_dotenv
 
 def export_active_reel(output_path):
-    load_dotenv(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), '.env'))
+    # Try to load from .env file first (for local development)
+    env_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), '.env')
+    if os.path.exists(env_path):
+        load_dotenv(env_path)
+        
     db_url = os.getenv('SUPABASE_DB_URL')
     
     if not db_url:
-        print("Error: SUPABASE_DB_URL not found in .env")
+        print("Error: SUPABASE_DB_URL not found in environment or .env file.")
         return
 
     conn = psycopg2.connect(db_url)
